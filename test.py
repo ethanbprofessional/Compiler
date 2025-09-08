@@ -32,7 +32,7 @@ def runFilesLex(folder):
         out = res.stdout.decode('utf-8').strip().splitlines()
         out_f = []
         for line in out:
-            no_num_line = re.sub("\s*\d+$", "", line)
+            no_num_line = re.sub("\\s*\\d+$", "", line)
             out_f.append(no_num_line)
 
         expected_out_fn = "out/" + filename.replace(".tig", ".txt");

@@ -1,5 +1,0 @@
-
-STRING(A
-B	C
-\)
-EOF

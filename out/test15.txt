@@ -1,5 +1,0 @@
-IF
-INT(20)
-THEN
-INT(3)
-EOF

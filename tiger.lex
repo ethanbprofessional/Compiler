@@ -7,6 +7,14 @@ val lexString = ref ""
 val lexComment = ref 0
 fun err(p1,p2) = ErrorMsg.error p1
 
+fun trim(yytext) = 
+            let
+                val str = valOf(String.fromString yytext)
+                val ret = String.substring(str, 1, (String.size str - 2)) (* trims quotation marks *)
+            in
+                ret
+            end
+
 fun eof() = let 
                 val pos = hd(!linePos)
                 val comment = 
@@ -21,15 +29,15 @@ fun eof() = let
 
 %%
 %structure TigerLexFun
-%s COMMENT ID STRING SPACE;
+%s COMMENT;
 number=[0-9]+;
 identifier=[a-zA-Z][a-zA-Z0-9_]*;
-commentStart = "/*";
-commentEnd = "*/";
-escapeSeq=\\[nt"\"""\\"];
-escapeEx=\\[ntb];
+stringLit=\"(\\\"|[^\"])*\";
+commentStart="/*";
+commentEnd="*/";
 %%
     <INITIAL> {commentStart}        =>   (lexComment := 1; YYBEGIN COMMENT; continue());
+    <INITIAL> " "|\t|\n             =>   (continue());
     <INITIAL> var  	                =>   (Tokens.VAR(yypos, yypos + 3));
     <INITIAL> let                   =>   (Tokens.LET(yypos, yypos + 3));
     <INITIAL> if                    =>   (Tokens.IF(yypos, yypos + 2));
@@ -47,8 +55,6 @@ escapeEx=\\[ntb];
     <INITIAL> function              =>   (Tokens.FUNCTION(yypos, yypos + 8));
     <INITIAL> in                    =>   (Tokens.IN(yypos, yypos + 2));
     <INITIAL> end                   =>   (Tokens.END(yypos, yypos + 3));
-    <INITIAL> {identifier}          =>   (Tokens.ID(yytext, yypos, yypos + String.size yytext));
-    <INITIAL> " "|\t|\n             =>   (continue());
     <INITIAL> "."                   =>   (Tokens.DOT(yypos, yypos + 1));
     <INITIAL> "("                   =>   (Tokens.LPAREN(yypos, yypos + 1));
     <INITIAL> ")"                   =>   (Tokens.RPAREN(yypos, yypos + 1));
@@ -73,25 +79,11 @@ escapeEx=\\[ntb];
     <INITIAL> "&"                   =>   (Tokens.AND(yypos, yypos + 1));
     <INITIAL> "|"                   =>   (Tokens.OR(yypos, yypos + 1));
     <INITIAL> {number}              =>   (Tokens.INT(valOf(Int.fromString yytext), yypos, yypos + String.size yytext));
-    <INITIAL> "\""                  =>   (lexString := ""; YYBEGIN STRING; continue());
-<INITIAL> "\"\\n\""             =>   (Tokens.STRING(str(chr(10)), yypos, yypos + 4));
-<INITIAL> "\"\""                =>   (Tokens.STRING("", yypos, yypos));
-
+    <INITIAL> {stringLiteral}       =>   (Tokens.STRING(trim(yytext), yypos, yypos + String.size yytext));
+    <INITIAL> {identifier}          =>   (Tokens.ID(yytext, yypos, yypos + String.size yytext));
     <INITIAL> .                     =>   (ErrorMsg.error yypos ("illegal character " ^ yytext); continue());
 
     <COMMENT> .                     =>   (continue());
     <COMMENT> \n                    =>   (continue());
     <COMMENT> {commentStart}        =>   (lexComment := !lexComment + 1; continue());
     <COMMENT> {commentEnd}          =>   (if !lexComment = 1 then YYBEGIN INITIAL else (); lexComment := !lexComment + ~1; continue());
-
-
-
-<STRING> \n                     =>   (lineNum := !lineNum+1; linePos := yypos :: !linePos; YYBEGIN SPACE; continue());
-<STRING> \\[0-9]{3}             =>   (Tokens.STRING(str(chr(valOf(Int.fromString (substring(yytext, 1, 3))))), yypos, yypos + 3));
-<STRING> \\\"                   =>   (lexString := (!lexString) ^ substring(yytext, 1, 1); continue());
-<STRING> [^\\\"\n]+{escapeSeq}  =>   (lexString := (!lexString) ^ substring(yytext, 0, String.size (yytext) + ~2) ^ substring(yytext, String.size (yytext) + ~1, 1); Tokens.STRING((!lexString), yypos, yypos));
-<STRING> [^\\\"\n]+\\           =>   (lexString := (!lexString) ^ substring(yytext, 0, String.size (yytext) + ~1); continue());
-<STRING> [^\\\"\n]+             =>   (lexString := (!lexString) ^ yytext; Tokens.STRING((!lexString), yypos, yypos));
-<STRING> "\""                   =>   (YYBEGIN INITIAL; continue());
-
-<SPACE> [\ \t]+\\               =>   (YYBEGIN STRING; continue());
